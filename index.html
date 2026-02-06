@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropShare - Transfer File P2P</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* Device ID */
+        .device-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .device-info .label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .device-info .device-id {
+            font-family: monospace;
+            font-size: 14px;
+            color: #00d9ff;
+            font-weight: bold;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #00ff88;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255,255,255,0.05);
+            color: #888;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            color: #000;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Send Section */
+        .section-title {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(0,217,255,0.4);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0,217,255,0.05);
+            margin-bottom: 20px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #00d9ff;
+            background: rgba(0,217,255,0.15);
+            transform: scale(1.02);
+        }
+
+        .drop-zone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .drop-zone-text {
+            font-size: 16px;
+            color: #aaa;
+        }
+
+        .drop-zone-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        /* Connect Section */
+        .connect-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .connect-box h3 {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .code-display {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .code-display .code {
+            font-family: monospace;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #00ff88;
+        }
+
+        .code-display .hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 16px;
+            font-family: monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        input[type="text"]::placeholder {
+            color: #555;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,217,255,0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        /* Connection Status */
+        .connection-status {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .connection-status.active {
+            display: block;
+        }
+
+        .connection-status.connected {
+            border-color: rgba(0,255,136,0.3);
+            background: rgba(0,255,136,0.1);
+        }
+
+        .connection-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .connection-header .icon {
+            font-size: 20px;
+        }
+
+        .connection-header .text {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .connection-peer {
+            font-family: monospace;
+            font-size: 12px;
+            color: #00d9ff;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        .btn-disconnect {
+            background: rgba(255,68,68,0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255,68,68,0.3);
+            margin-top: 10px;
+        }
+
+        /* File Queue */
+        .file-queue {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .file-item-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .file-icon {
+            font-size: 24px;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .file-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .file-status.sending {
+            background: rgba(0,217,255,0.2);
+            color: #00d9ff;
+        }
+
+        .file-status.complete {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+        }
+
+        .file-status.waiting {
+            background: rgba(255,170,0,0.2);
+            color: #ffaa00;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            border-radius: 3px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        /* Receive Section */
+        .received-files {
+            margin-top: 20px;
+        }
+
+        .received-file {
+            background: rgba(0,255,136,0.1);
+            border: 1px solid rgba(0,255,136,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .received-file .file-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #00ff88, #00d9ff);
+            color: #000;
+            flex: 1;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            z-index: 1000;
+            transition: transform 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success {
+            border-color: rgba(0,255,136,0.5);
+        }
+
+        .toast.error {
+            border-color: rgba(255,68,68,0.5);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Instructions */
+        .instructions {
+            background: rgba(0,217,255,0.1);
+            border: 1px solid rgba(0,217,255,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .instructions h4 {
+            font-size: 14px;
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            font-size: 13px;
+            color: #aaa;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 6px;
+        }
+
+        /* Authorized Devices */
+        .authorized-devices {
+            margin-top: 20px;
+        }
+
+        .device-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .device-item.online {
+            border-color: rgba(0,255,136,0.3);
+        }
+
+        .device-item .info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .device-item .name {
+            font-size: 14px;
+        }
+
+        .device-item .id {
+            font-family: monospace;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .btn-small {
+            padding: 8px 14px;
+            font-size: 12px;
+        }
+
+        .quick-connect {
+            margin-top: 15px;
+        }
+
+        .quick-connect-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        /* Hidden file input */
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📡 DropShare</h1>
+        <p class="subtitle">Transfer File P2P Real-time</p>
+
+        <!-- Device Info -->
+        <div class="device-info">
+            <div>
+                <div class="label">Device ID Kamu</div>
+                <div class="device-id" id="myDeviceId">Connecting...</div>
+            </div>
+            <div class="status-dot" id="statusDot"></div>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="connection-status" id="connectionStatus">
+            <div class="connection-header">
+                <span class="icon">🔗</span>
+                <span class="text" id="connectionText">Terhubung dengan</span>
+            </div>
+            <div class="connection-peer" id="connectedPeer">-</div>
+            <button class="btn btn-disconnect btn-full" onclick="disconnect()">Putuskan Koneksi</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('send')">📤 Kirim</button>
+            <button class="tab" onclick="switchTab('receive')">📥 Terima</button>
+            <button class="tab" onclick="switchTab('devices')">📱 Devices</button>
+        </div>
+
+        <!-- Send Tab -->
+        <div class="tab-content active" id="sendTab">
+            <div class="section-title">Kirim File ke Device Lain</div>
+            
+            <!-- Connect to Peer -->
+            <div class="connect-box">
+                <h3>🔌 Hubungkan ke Device Tujuan</h3>
+                <div class="input-group">
+                    <input type="text" id="targetPeerId" placeholder="Masukkan Device ID tujuan" maxlength="6">
+                    <button class="btn btn-primary" onclick="connectToPeer()" id="connectBtn">Hubungkan</button>
+                </div>
+            </div>
+
+            <!-- Drop Zone -->
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="drop-zone-icon">📁</div>
+                <div class="drop-zone-text">Drop file di sini atau tap untuk pilih</div>
+                <div class="drop-zone-hint">Max 100MB per file</div>
+            </div>
+            <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
+
+            <!-- File Queue -->
+            <div class="file-queue" id="fileQueue"></div>
+
+            <div class="instructions">
+                <h4>📖 Cara Kirim File:</h4>
+                <ol>
+                    <li>Pastikan device penerima sudah buka halaman ini</li>
+                    <li>Minta <strong>Device ID</strong> dari penerima</li>
+                    <li>Masukkan Device ID dan klik <strong>Hubungkan</strong></li>
+                    <li>Setelah terhubung, drop atau pilih file untuk dikirim</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Receive Tab -->
+        <div class="tab-content" id="receiveTab">
+            <div class="section-title">Terima File dari Device Lain</div>
+            
+            <div class="code-display">
+                <div class="code" id="myCodeDisplay">------</div>
+                <div class="hint">Bagikan kode ini ke pengirim</div>
+            </div>
+
+            <button class="btn btn-secondary btn-full" onclick="copyMyCode()">📋 Salin Device ID</button>
+
+            <!-- Received Files -->
+            <div class="received-files" id="receivedFiles">
+                <div class="empty-state">
+                    <div class="icon">📭</div>
+                    <p>Belum ada file diterima</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Bagikan Device ID kamu ke pengirim</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Devices Tab -->
+        <div class="tab-content" id="devicesTab">
+            <div class="section-title">Device Tersimpan</div>
+            
+            <div class="connect-box">
+                <h3>➕ Tambah Device Baru</h3>
+                <div class="input-group">
+                    <input type="text" id="newDeviceId" placeholder="Device ID" maxlength="6">
+                </div>
+                <div class="input-group">
+                    <input type="text" id="newDeviceName" placeholder="Nama Device (opsional)" style="text-transform: none; letter-spacing: normal;">
+                </div>
+                <button class="btn btn-primary btn-full" onclick="saveDevice()">Simpan Device</button>
+            </div>
+
+            <div class="authorized-devices" id="authorizedDevices">
+                <div class="empty-state">
+                    <div class="icon">📱</div>
+                    <p>Belum ada device tersimpan</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ========== GLOBAL VARIABLES ==========
+        let peer = null;
+        let currentConnection = null;
+        let myPeerId = '';
+        let receivedChunks = {};
+        let savedDevices = JSON.parse(localStorage.getItem('savedDevices') || '[]');
+
+        // ========== INITIALIZATION ==========
+        function init() {
+            // Generate or get existing peer ID
+            let savedPeerId = localStorage.getItem('myPeerId');
+            if (!savedPeerId) {
+                savedPeerId = generateCode(6);
+                localStorage.setItem('myPeerId', savedPeerId);
+            }
+            myPeerId = savedPeerId;
+            
+            // Initialize PeerJS
+            initPeer();
+            
+            // Setup drop zone
+            setupDropZone();
+            
+            // Render saved devices
+            renderSavedDevices();
+        }
+
+        function initPeer() {
+            document.getElementById('myDeviceId').textContent = 'Connecting...';
+            document.getElementById('myCodeDisplay').textContent = '------';
+            
+            peer = new Peer(myPeerId, {
+                debug: 1
+            });
+
+            peer.on('open', (id) => {
+                console.log('Connected to PeerJS server with ID:', id);
+                myPeerId = id;
+                localStorage.setItem('myPeerId', id);
+                document.getElementById('myDeviceId').textContent = id;
+                document.getElementById('myCodeDisplay').textContent = id;
+                document.getElementById('statusDot').classList.add('online');
+                showToast('✅ Terhubung ke server', 'success');
+            });
+
+            peer.on('connection', (conn) => {
+                console.log('Incoming connection from:', conn.peer);
+                handleConnection(conn);
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                document.getElementById('statusDot').classList.remove('online');
+                
+                if (err.type === 'unavailable-id') {
+                    // ID sudah dipakai, generate baru
+                    myPeerId = generateCode(6);
+                    localStorage.setItem('myPeerId', myPeerId);
+                    setTimeout(initPeer, 1000);
+                } else if (err.type === 'peer-unavailable') {
+                    showToast('❌ Device tidak ditemukan atau offline', 'error');
+                } else {
+                    showToast('❌ Error: ' + err.type, 'error');
+                    // Reconnect after error
+                    setTimeout(initPeer, 3000);
+                }
+            });
+
+            peer.on('disconnected', () => {
+                console.log('Disconnected from server');
+                document.getElementById('statusDot').classList.remove('online');
+                // Try to reconnect
+                setTimeout(() => {
+                    if (peer && !peer.destroyed) {
+                        peer.reconnect();
+                    }
+                }, 3000);
+            });
+        }
+
+        // ========== CONNECTION HANDLING ==========
+        function connectToPeer() {
+            const targetId = document.getElementById('targetPeerId').value.trim().toUpperCase();
+            
+            if (!targetId) {
+                showToast('⚠️ Masukkan Device ID tujuan', 'error');
+                return;
+            }
+
+            if (targetId === myPeerId) {
+                showToast('⚠️ Tidak bisa konek ke diri sendiri', 'error');
+                return;
+            }
+
+            if (currentConnection) {
+                currentConnection.close();
+            }
+
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('connectBtn').innerHTML = '<span class="spinner"></span>Connecting...';
+
+            const conn = peer.connect(targetId, {
+                reliable: true
+            });
+
+            conn.on('open', () => {
+                handleConnection(conn);
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = 'Hubungkan';
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                showToast('❌ Gagal terhubung', 'error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = 'Hubungkan';
+            });
+
+            // Timeout
+            setTimeout(() => {
+                if (!currentConnection) {
+                    showToast('❌ Connection timeout', 'error');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('connectBtn').textContent = 'Hubungkan';
+                }
+            }, 10000);
+        }
+
+        function handleConnection(conn) {
+            currentConnection = conn;
+            
+            showToast('✅ Terhubung dengan ' + conn.peer, 'success');
+            
+            // Update UI
+            document.getElementById('connectionStatus').classList.add('active', 'connected');
+            document.getElementById('connectedPeer').textContent = conn.peer;
+            document.getElementById('targetPeerId').value = '';
+
+            conn.on('data', (data) => {
+                handleIncomingData(data);
+            });
+
+            conn.on('close', () => {
+                console.log('Connection closed');
+                currentConnection = null;
+                document.getElementById('connectionStatus').classList.remove('active', 'connected');
+                showToast('🔌 Koneksi terputus', 'error');
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                showToast('❌ Connection error', 'error');
+            });
+        }
+
+        function disconnect() {
+            if (currentConnection) {
+                currentConnection.close();
+                currentConnection = null;
+            }
+            document.getElementById('connectionStatus').classList.remove('active', 'connected');
+            showToast('🔌 Koneksi diputus', 'success');
+        }
+
+        // ========== FILE HANDLING ==========
+        function setupDropZone() {
+            const dropZone = document.getElementById('dropZone');
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        function handleFiles(files) {
+            if (!currentConnection) {
+                showToast('⚠️ Hubungkan ke device tujuan dulu', 'error');
+                return;
+            }
+
+            for (const file of files) {
+                if (file.size > 100 * 1024 * 1024) {
+                    showToast('⚠️ File ' + file.name + ' terlalu besar (max 100MB)', 'error');
+                    continue;
+                }
+                sendFile(file);
+            }
+        }
+
+        function sendFile(file) {
+            const fileId = generateCode(8);
+            const chunkSize = 64 * 1024; // 64KB chunks
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            
+            // Add to queue UI
+            addFileToQueue(fileId, file.name, file.size, 'sending');
+
+            // Send file metadata first
+            currentConnection.send({
+                type: 'file-start',
+                fileId: fileId,
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type,
+                totalChunks: totalChunks
+            });
+
+            // Read and send chunks
+            let currentChunk = 0;
+            const reader = new FileReader();
+
+            function sendNextChunk() {
+                const start = currentChunk * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const blob = file.slice(start, end);
+                
+                reader.onload = (e) => {
+                    currentConnection.send({
+                        type: 'file-chunk',
+                        fileId: fileId,
+                        chunkIndex: currentChunk,
+                        totalChunks: totalChunks,
+                        data: e.target.result
+                    });
+
+                    currentChunk++;
+                    const progress = (currentChunk / totalChunks) * 100;
+                    updateFileProgress(fileId, progress);
+
+                    if (currentChunk < totalChunks) {
+                        // Small delay to prevent overwhelming
+                        setTimeout(sendNextChunk, 10);
+                    } else {
+                        // Send complete signal
+                        currentConnection.send({
+                            type: 'file-complete',
+                            fileId: fileId
+                        });
+                        updateFileStatus(fileId, 'complete');
+                        showToast('✅ File terkirim: ' + file.name, 'success');
+                    }
+                };
+
+                reader.readAsArrayBuffer(blob);
+            }
+
+            sendNextChunk();
+        }
+
+        function handleIncomingData(data) {
+            switch (data.type) {
+                case 'file-start':
+                    receivedChunks[data.fileId] = {
+                        fileName: data.fileName,
+                        fileSize: data.fileSize,
+                        fileType: data.fileType,
+                        totalChunks: data.totalChunks,
+                        chunks: new Array(data.totalChunks),
+                        receivedCount: 0
+                    };
+                    addReceivedFileUI(data.fileId, data.fileName, data.fileSize, 0);
+                    showToast('📥 Menerima: ' + data.fileName, 'success');
+                    break;
+
+                case 'file-chunk':
+                    if (receivedChunks[data.fileId]) {
+                        receivedChunks[data.fileId].chunks[data.chunkIndex] = data.data;
+                        receivedChunks[data.fileId].receivedCount++;
+                        
+                        const progress = (receivedChunks[data.fileId].receivedCount / data.totalChunks) * 100;
+                        updateReceivedFileProgress(data.fileId, progress);
+                    }
+                    break;
+
+                case 'file-complete':
+                    if (receivedChunks[data.fileId]) {
+                        const fileData = receivedChunks[data.fileId];
+                        const blob = new Blob(fileData.chunks, { type: fileData.fileType });
+                        
+                        completeReceivedFile(data.fileId, fileData.fileName, blob);
+                        showToast('✅ File diterima: ' + fileData.fileName, 'success');
+                    }
+                    break;
+            }
+        }
+
+        // ========== UI FUNCTIONS ==========
+        function addFileToQueue(fileId, fileName, fileSize, status) {
+            const queue = document.getElementById('fileQueue');
+            const html = `
+                <div class="file-item" id="file-${fileId}">
+                    <div class="file-item-header">
+                        <span class="file-icon">📄</span>
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(fileName)}</div>
+                            <div class="file-size">${formatSize(fileSize)}</div>
+                        </div>
+                        <span class="file-status ${status}" id="status-${fileId}">${status === 'sending' ? 'Mengirim...' : status}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-${fileId}"></div>
+                    </div>
+                </div>
+            `;
+            queue.insertAdjacentHTML('beforeend', html);
+        }
+
+        function updateFileProgress(fileId, progress) {
+            const progressEl = document.getElementById('progress-' + fileId);
+            if (progressEl) {
+                progressEl.style.width = progress + '%';
+            }
+        }
+
+        function updateFileStatus(fileId, status) {
+            const statusEl = document.getElementById('status-' + fileId);
+            if (statusEl) {
+                statusEl.className = 'file-status ' + status;
+                statusEl.textContent = status === 'complete' ? 'Terkirim ✓' : status;
+            }
+        }
+
+        function addReceivedFileUI(fileId, fileName, fileSize, progress) {
+            const container = document.getElementById('receivedFiles');
+            
+            // Remove empty state if exists
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const html = `
+                <div class="file-item" id="received-${fileId}">
+                    <div class="file-item-header">
+                        <span class="file-icon">📥</span>
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(fileName)}</div>
+                            <div class="file-size">${formatSize(fileSize)}</div>
+                        </div>
+                        <span class="file-status sending" id="recv-status-${fileId}">Menerima...</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="recv-progress-${fileId}"></div>
+                    </div>
+                    <div class="file-actions" id="actions-${fileId}" style="display: none;">
+                        <button class="btn btn-download" id="download-${fileId}">📥 Download</button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('afterbegin', html);
+        }
+
+        function updateReceivedFileProgress(fileId, progress) {
+            const progressEl = document.getElementById('recv-progress-' + fileId);
+            if (progressEl) {
+                progressEl.style.width = progress + '%';
+            }
+        }
+
+        function completeReceivedFile(fileId, fileName, blob) {
+            const statusEl = document.getElementById('recv-status-' + fileId);
+            const actionsEl = document.getElementById('actions-' + fileId);
+            const downloadBtn = document.getElementById('download-' + fileId);
+
+            if (statusEl) {
+                statusEl.className = 'file-status complete';
+                statusEl.textContent = 'Selesai ✓';
+            }
+
+            if (actionsEl) {
+                actionsEl.style.display = 'flex';
+            }
+
+            if (downloadBtn) {
+                downloadBtn.onclick = () => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+            }
+        }
+
+        // ========== SAVED DEVICES ==========
+        function saveDevice() {
+            const deviceId = document.getElementById('newDeviceId').value.trim().toUpperCase();
+            const deviceName = document.getElementById('newDeviceName').value.trim() || 'Device ' + (savedDevices.length + 1);
+
+            if (!deviceId) {
+                showToast('⚠️ Masukkan Device ID', 'error');
+                return;
+            }
+
+            if (deviceId === myPeerId) {
+                showToast('⚠️ Tidak bisa menyimpan device sendiri', 'error');
+                return;
+            }
+
+            // Check if already exists
+            if (savedDevices.find(d => d.id === deviceId)) {
+                showToast('⚠️ Device sudah tersimpan', 'error');
+                return;
+            }
+
+            savedDevices.push({
+                id: deviceId,
+                name: deviceName,
+                addedAt: Date.now()
+            });
+
+            localStorage.setItem('savedDevices', JSON.stringify(savedDevices));
+            
+            document.getElementById('newDeviceId').value = '';
+            document.getElementById('newDeviceName').value = '';
+            
+            renderSavedDevices();
+            showToast('✅ Device tersimpan', 'success');
+        }
+
+        function renderSavedDevices() {
+            const container = document.getElementById('authorizedDevices');
+            
+            if (savedDevices.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📱</div>
+                        <p>Belum ada device tersimpan</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            for (const device of savedDevices) {
+                html += `
+                    <div class="device-item" id="device-${device.id}">
+                        <div class="info">
+                            <div>
+                                <div class="name">${escapeHtml(device.name)}</div>
+                                <div class="id">${device.id}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary btn-small" onclick="quickConnect('${device.id}')">Connect</button>
+                            <button class="btn btn-secondary btn-small" onclick="removeDevice('${device.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function quickConnect(deviceId) {
+            document.getElementById('targetPeerId').value = deviceId;
+            switchTab('send');
+            connectToPeer();
+        }
+
+        function removeDevice(deviceId) {
+            savedDevices = savedDevices.filter(d => d.id !== deviceId);
+            localStorage.setItem('savedDevices', JSON.stringify(savedDevices));
+            renderSavedDevices();
+            showToast('🗑️ Device dihapus', 'success');
+        }
+
+        // ========== UTILITY FUNCTIONS ==========
+        function generateCode(length) {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`.tab:nth-child(${tabName === 'send' ? 1 : tabName === 'receive' ? 2 : 3})`).classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        function copyMyCode() {
+            navigator.clipboard.writeText(myPeerId).then(() => {
+                showToast('📋 Device ID disalin!', 'success');
+            }).catch(() => {
+                // Fallback
+                const input = document.createElement('input');
+                input.value = myPeerId;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('📋 Device ID disalin!', 'success');
+            });
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // ========== START ==========
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
